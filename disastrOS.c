@@ -24,6 +24,9 @@ ListHead timer_list;
 // a resource can be a device, a file or an ipc thing
 ListHead resources_list;
 
+// declaring list msg queues
+ListHead msg_queues_list;
+
 SyscallFunctionType syscall_vector[DSOS_MAX_SYSCALLS];
 int syscall_numarg[DSOS_MAX_SYSCALLS];
 
@@ -177,6 +180,28 @@ void disastrOS_start(void (*f)(void*), void* f_args, char* logfile){
   syscall_vector[DSOS_CALL_SHUTDOWN]      = internal_shutdown;
   syscall_numarg[DSOS_CALL_SHUTDOWN]      = 0;
 
+
+  // msg queue syscall installation **********************************************************************
+
+  syscall_vector[DSOS_CALL_MQ_CREATE]     = internal_msgQueueCreate;
+  syscall_numarg[DSOS_CALL_MQ_CREATE]     = 1;
+
+  syscall_vector[DSOS_CALL_MQ_OPEN]     = internal_msgQueueOpen;
+  syscall_numarg[DSOS_CALL_MQ_OPEN]     = 1;
+
+  syscall_vector[DSOS_CALL_MQ_CLOSE]     = internal_msgQueueClose;
+  syscall_numarg[DSOS_CALL_MQ_CLOSE]     = 1;
+
+  syscall_vector[DSOS_CALL_MQ_UNLINK]     = internal_msgQueueUnlink;
+  syscall_numarg[DSOS_CALL_MQ_UNLINK]     = 1;
+
+  syscall_vector[DSOS_CALL_MQ_READ]     = internal_msgQueueRead;
+  syscall_numarg[DSOS_CALL_MQ_READ]     = 3;
+
+  syscall_vector[DSOS_CALL_MQ_WRITE]     = internal_msgQueueWrite;
+  syscall_numarg[DSOS_CALL_MQ_WRITE]     = 4;
+
+//***************************************************************************************************
   // setup the scheduling lists
   running=0;
   List_init(&ready_list);
@@ -184,6 +209,10 @@ void disastrOS_start(void (*f)(void*), void* f_args, char* logfile){
   List_init(&zombie_list);
   List_init(&resources_list);
   List_init(&timer_list);
+
+  //*************************************************************************************************
+  // INITIALIZATION OF MSG QUEUE LIST
+  List_init(&msg_queues_list);
 
 
   /* INITIALIZATION OF SYSCALL AND INTERRUPT INFRASTRUCTIRE*/
@@ -286,7 +315,45 @@ int disastrOS_destroyResource(int resource_id) {
   return disastrOS_syscall(DSOS_CALL_DESTROY_RESOURCE, resource_id);
 }
 
+//****************************************************************************************************************************************
+// IMPLEMENTATION OF MSG QUEUE SYSCALL
 
+// takes msg queue name as input to create it
+int disastrOS_msgQueueCreate(const char *name) {
+  return disastrOS_syscall(DSOS_CALL_MQ_CREATE, name);
+}
+
+// takes msg queue name as input to open it
+int disastrOS_msgQueueOpen(const char *name) {
+  return disastrOS_syscall(DSOS_CALL_MQ_OPEN, name);
+}
+
+// closing "mqdes" descriptor associated with msg queue
+int disastrOS_msgQueueClose(int mqdes) {
+  return disastrOS_syscall(DSOS_CALL_MQ_CLOSE, mqdes);
+}
+
+// msg queue name as input, removes it immediately
+// queue will be destroyed once all processes associated closed their descriptors
+
+int disastrOS_msgQueueUnlink(const char *name) {
+  return disastrOS_syscall(DSOS_CALL_MQ_UNLINK, name);
+}
+
+// removes max priority msg from the queue referred from mqdes
+// then inserts it to buffer pointed by msg_ptr
+// needs msg_len specified (buffer length)
+int disastrOS_msgQueueRead(int mqdes, char *msg_ptr, unsigned msg_len) {
+  return disastrOS_syscall(DSOS_CALL_MQ_READ, mqdes, msg_ptr, msg_len);
+}
+
+// add messagge pointed by msg_ptr to msg queue (mqdes)
+// specifies msg_len and msg priority
+int disastrOS_msgQueueWrite(int mqdes, const char *msg_ptr, unsigned msg_len, unsigned int priority) {
+  return disastrOS_syscall(DSOS_CALL_MQ_WRITE, mqdes, msg_ptr, msg_len, priority);
+}
+
+//*****************************************************************************************************************************************************
 
 void disastrOS_printStatus(){
   printf("****************** DisastrOS ******************\n");
